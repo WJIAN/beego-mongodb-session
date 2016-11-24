@@ -72,7 +72,6 @@ func (p *Provider) SessionRead(sid string) (session.Store, error) {
 	rs := &SessionStore{sid: sid, values: kv, maxLifetime: p.maxLifetime, mgoSession: p.mgoSession}
 	return rs, nil
 }
-
 func (p *Provider) SessionExist(sid string) bool {
 	mgosession := p.mgoSession.Clone()
 	defer mgosession.Close()
