@@ -42,7 +42,7 @@ func (p *Provider) SessionRead(sid string) (session.Store, error) {
 	mgosession := p.mgoSession.Clone()
 	defer mgosession.Close()
 
-	var s interface{}
+	var s bson.M
 	change := mgo.Change{
 		Update: bson.M{
 			"$setOnInsert": bson.M{
@@ -54,16 +54,16 @@ func (p *Provider) SessionRead(sid string) (session.Store, error) {
 		ReturnNew: true,
 		Upsert:    true,
 	}
-	_, err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": sid}).Apply(change, s)
+	_, err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": sid}).Apply(change, &s)
 	if err != nil {
 		return nil, err
 	}
 
 	var kv map[interface{}]interface{}
-	if s == nil || len(s.(string)) == 0 {
+	if s == nil {
 		kv = make(map[interface{}]interface{})
 	} else {
-		kv, err = session.DecodeGob([]byte(s.(string)))
+		kv, err = session.DecodeGob([]byte(s["session_data"].([]uint8)))
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +90,7 @@ func (p *Provider) SessionRegenerate(oldsid, sid string) (session.Store, error) 
 	mgosession := p.mgoSession.Clone()
 	defer mgosession.Close()
 
-	var s interface{}
+	var s bson.M
 	change := mgo.Change{
 		Update: bson.M{
 			"$set": bson.M{
@@ -106,16 +106,16 @@ func (p *Provider) SessionRegenerate(oldsid, sid string) (session.Store, error) 
 		ReturnNew: true,
 		Upsert:    true,
 	}
-	_, err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": oldsid}).Apply(change, s)
+	_, err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": oldsid}).Apply(change, &s)
 	if err != nil {
 		return nil, err
 	}
 
 	var kv map[interface{}]interface{}
-	if s == nil || len(s.(string)) == 0 {
+	if s == nil {
 		kv = make(map[interface{}]interface{})
 	} else {
-		kv, err = session.DecodeGob([]byte(s.(string)))
+		kv, err = session.DecodeGob([]byte(s["session_data"].([]uint8)))
 		if err != nil {
 			return nil, err
 		}
