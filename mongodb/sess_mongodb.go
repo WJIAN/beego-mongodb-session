@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	CollectionName  = "session"
+	collectionName  = "session"
 	mongodbProvider = &Provider{}
 )
 
@@ -28,11 +28,11 @@ func (p *Provider) SessionInit(maxLifetime int64, savePath string) error {
 
 	// init mongodb session
 	if p.mgoSession == nil {
-		var err error
-		p.mgoSession, err = mgo.Dial(savePath)
+		s, err := mgo.Dial(savePath)
 		if err != nil {
 			return err
 		}
+		p.mgoSession = s
 	}
 
 	return nil
@@ -51,16 +51,15 @@ func (p *Provider) SessionRead(sid string) (session.Store, error) {
 				"session_expire": time.Now().Unix() + p.maxLifetime,
 			},
 		},
-		ReturnNew: true,
-		Upsert:    true,
+		Upsert: true,
 	}
-	_, err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": sid}).Apply(change, &s)
+	_, err := mgosession.DB("").C(collectionName).Find(bson.M{"session_key": sid}).Apply(change, &s)
 	if err != nil {
 		return nil, err
 	}
 
 	var kv map[interface{}]interface{}
-	if s == nil || s["session_data"] == nil {
+	if s == nil {
 		kv = make(map[interface{}]interface{})
 	} else {
 		kv, err = session.DecodeGob([]byte(s["session_data"].([]uint8)))
@@ -77,7 +76,7 @@ func (p *Provider) SessionExist(sid string) bool {
 	defer mgosession.Close()
 
 	var s interface{}
-	err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": sid}).One(&s)
+	err := mgosession.DB("").C(collectionName).Find(bson.M{"session_key": sid}).One(&s)
 	if err != nil {
 		return false
 	}
@@ -102,16 +101,15 @@ func (p *Provider) SessionRegenerate(oldsid, sid string) (session.Store, error) 
 				"session_expire": time.Now().Unix() + p.maxLifetime,
 			},
 		},
-		ReturnNew: true,
-		Upsert:    true,
+		Upsert: true,
 	}
-	_, err := mgosession.DB("").C(CollectionName).Find(bson.M{"session_key": oldsid}).Apply(change, &s)
+	_, err := mgosession.DB("").C(collectionName).Find(bson.M{"session_key": oldsid}).Apply(change, &s)
 	if err != nil {
 		return nil, err
 	}
 
 	var kv map[interface{}]interface{}
-	if s == nil || s["session_data"] == nil {
+	if s == nil {
 		kv = make(map[interface{}]interface{})
 	} else {
 		kv, err = session.DecodeGob([]byte(s["session_data"].([]uint8)))
@@ -128,7 +126,7 @@ func (p *Provider) SessionDestroy(sid string) error {
 	mgosession := p.mgoSession.Clone()
 	defer mgosession.Close()
 
-	err := mgosession.DB("").C(CollectionName).Remove(bson.M{"session_key": sid})
+	err := mgosession.DB("").C(collectionName).Remove(bson.M{"session_key": sid})
 	if err != nil {
 		return err
 	}
@@ -139,7 +137,7 @@ func (p *Provider) SessionGC() {
 	mgosession := p.mgoSession.Clone()
 	defer mgosession.Close()
 
-	mgosession.DB("").C(CollectionName).RemoveAll(bson.M{"session_expire": bson.M{"$lt": time.Now().Unix()}})
+	mgosession.DB("").C(collectionName).RemoveAll(bson.M{"session_expire": bson.M{"$lt": time.Now().Unix()}})
 
 	return
 }
@@ -148,12 +146,12 @@ func (p *Provider) SessionAll() int {
 	mgosession := p.mgoSession.Clone()
 	defer mgosession.Close()
 
-	count, _ := mgosession.DB("").C(CollectionName).Find(nil).Count()
+	count, _ := mgosession.DB("").C(collectionName).Find(nil).Count()
 
 	return count
 }
 
-// SessionStore mongodb session stor
+// SessionStore mongodb session store
 type SessionStore struct {
 	sid         string
 	lock        sync.RWMutex
@@ -203,7 +201,7 @@ func (s *SessionStore) SessionRelease(w http.ResponseWriter) {
 		return
 	}
 
-	mgosession.DB("").C(CollectionName).Update(bson.M{"session_key": s.sid}, bson.M{"$set": bson.M{"session_data": b}})
+	mgosession.DB("").C(collectionName).Update(bson.M{"session_key": s.sid}, bson.M{"$set": bson.M{"session_data": b}})
 }
 
 func init() {
