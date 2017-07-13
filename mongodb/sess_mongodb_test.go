@@ -16,6 +16,9 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	if !p.SessionExist("foo-bar") {
+		t.Error("SessionExist err")
+	}
 	err = ss.Set("foo", "bar")
 	if err != nil {
 		t.Error(err)
